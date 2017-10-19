@@ -1,0 +1,8 @@
+input[type=radio] {
+  // appearance: radio !important;
+  // -webkit-appearance: radio !important;
+  // -moz-appearance: radio !important;
+  // left: 0 !important;
+  // opacity: 1 !important;
+  // position: inherit !important;
+}

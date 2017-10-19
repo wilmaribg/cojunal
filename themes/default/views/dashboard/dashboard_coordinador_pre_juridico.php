@@ -1,0 +1,30 @@
+<link href="<?php echo Yii::app()->baseUrl; ?>/assets/site/css/profile_admin/usuarios.css" rel="stylesheet" type="text/css" />
+
+<style>
+  .item.input {display: none; }
+  .item.item-text-0 {display: block; }
+  a {cursor: pointer; }
+</style>
+
+<div id="usuarios">
+  <section class="conten_inicial">
+    <section class="wrapper_l dashContent p_t_25">
+      <section class="padding panelBG">       
+      
+        <table class="bordered highlight responsive-table">
+          <thead id="campanasTableHead">
+          </thead>
+          <tbody id="campanasTableBody">
+          </tbody>
+        </table>
+
+      </section>
+    </section>
+  </section>
+
+</div>
+
+<script>
+  window.baseUrl = "<?php echo Yii::app()->baseUrl; ?>";
+  <?php include realpath('./') . '/themes/default/views/admin/campana/campanas.js' ?>
+</script>

@@ -1,0 +1,250 @@
+<?php
+
+require_once realpath('./') . '/protected/controllers/front/AdminBaseController.php';
+
+class AdminController extends AdminBaseController {
+
+    public function init() 
+    {
+       //Yii::app()->getComponent("bootstrap");
+        //Yii::app()->theme = $this->themeFront; //set theme default front
+        
+        $session = Yii::app()->session;
+        // var_dump($_SESSION);
+        // var_dump($session);
+        // var_dump($session['profile']);
+        // var_dump($_SESSION['profile']);
+        // exit();
+        if($_SERVER['REQUEST_URI'] != '/beta/admin/login') {
+        // var_dump($session['cojunal']);
+        //     if(isset($session['cojunal'])){
+        //          //Yii::log($session['cojunal'] ." -> Profile => ". $session['profile'],"error","init");
+        //          if($session['profile']=="administrador"){
+        //              $this->layout = 'layout_secure';    
+        //          }else {
+        //              $this->actionLogout();    
+        //          }    
+        //     }else {
+        //          $this->actionLogout();    
+        //     }
+        }
+       Yii::app()->errorHandler->errorAction = 'site/error';
+
+        // $this->layout = 'layout_secure';
+        // parent::init();
+    }
+
+    /**
+     * [actionIndex description]
+     * @return [type] [description]
+     */
+    public function actionIndex()
+    {
+        $this->layout = 'main_admin';
+        $this->render('dashboard');
+    }
+    
+    /**
+     * [actionLogin description]
+     * @return [type] [description]
+     */
+    public function actionLogin()
+    {
+        $this->layout = 'main_secure_admin';
+        $this->render('login');
+    }
+
+    /**
+     * [actionDoLogin description]
+     * @return [type] [description]
+     */
+    public function actionDoLogin()
+    {
+        Yii::import('application.recaptcha.ReCaptcha.*');
+        require_once("ReCaptcha.php");
+        // Register API keys at https://www.google.com/recaptcha/admin
+        if (isset($_POST['g-recaptcha-response'])){ 
+            $recaptcha = new ReCaptcha;
+            $resp = $recaptcha->verify($_POST['g-recaptcha-response'], $_SERVER['REMOTE_ADDR']);
+            if ($resp->isSuccess()){
+                Yii::log("Entre en resp", "error", "Login" );
+                $model = new LoginForm;
+                $model->username = $_POST['username'];
+                $model->password = $_POST['password'];
+                Yii::log("Entre a validar en Assigment", "error", "login");
+                if($model->login(true) != false) { 
+                    // $session = Yii::app()->session;
+                    Yii::app()->session['cojunal'] = $model->login(true);
+                    Yii::app()->session['profile'] = 'administrador';
+                    $this->redirect(Yii::app()->homeUrl . "admin/dashboard");
+                }
+            }
+        }
+    }
+
+    /**
+     * [actionLogout description]
+     * @return [type] [description]
+     */
+    public function actionLogout() 
+    {
+        Yii::app()->homeUrl = Yii::app()->homeUrl . "admin/login";
+        Yii::app()->user->logout();
+        $this->redirect(Yii::app()->homeUrl);
+    }
+
+    /**
+     * [actionDashboard description]
+     * @return [type] [description]
+     */
+    public function actionDashboard()
+    {
+        $this->layout = 'layout_dashboad_profile_admin';
+        $this->render('dashboard');
+    }
+
+    /**
+     * [getCoordinadores description]
+     * @param  integer $status [description]
+     * @param  integer $active [description]
+     * @return [type]          [description]
+     */
+    private function getAdvisers($status = 0, $active = 0) {
+    	$model = new Advisers;
+    	if($active == -1) {
+    		return $model->findAll('status_idStatus='.$status);
+    	}elseif ($active < -1) {
+    		return $model->findAll('status_idStatus='.$status.' and active='.$active);
+    	}
+    }
+
+    /**
+     * [actionUsuarios description]
+     * @return [type] [description]
+     */
+    public function actionUsuarios()
+    {
+    	$data = [ 
+    		'coordinadores' => $this->getAdvisers(6, -1),
+    		'coordinadores_select' => $this->getAdvisers(6, 1),
+    		'asesores' => $this->getAdvisers(2, -1),
+    	];
+      $this->layout = 'layout_dashboad_profile_admin';
+      $this->render('usuarios', $data);
+    }
+
+    /**
+     * Función que permite crear el usuario asesor 
+     * @return [type] [description]
+     */
+    public function actionCreateAsesor() {
+      $model = new Advisers;
+      $newToken = new Token;
+      $now = date("Y-m-d H:m:s");
+      $keyPermission = md5($now);
+      $newToken->permision_key = $keyPermission;
+      $newToken->date = $now;
+      $modelAuthAssigment = new AuthAssignment;
+
+      $this->performAjaxValidation($model, 'advisers-form');
+
+      if (isset($_POST['Advisers'])) {
+        $model->setAttributes($_POST['Advisers']);
+        $modelAuthAssigment->userid = $model->idAuthAssignment;
+        $model->email = $model->idAuthAssignment;
+        unset($model->idAuthAssignment);
+        $modelAuthAssigment->bizrule = "Rol asesor";
+        $modelAuthAssigment->data = "Rol asesor";
+        $modelAuthAssigment->itemname = 'Asesor';
+        $model->dCreation = $now ;
+        $model->dUpdate = $now ;
+        $model->weeklyGoal = 0;
+        $model->monthlyGoal = 0;
+        $hash = substr(md5($now), 0, 8);
+        $model->passwd = md5($hash);
+
+        if(count(Advisers::model()->findByAttributes(array('email'=>$model->email))) > 0 
+          || count(AuthAssignment::model()->findByAttributes(array('userid'=>$modelAuthAssigment->userid))) > 0) {
+            Yii::log("No se pudo crear el usuario. Ya existe el correo o el nombre de usuario en la base de datos" . $keyPermission, "error", "actionCreate");
+            Yii::app()->user->setFlash("error", Yii::t('app', "No se pudo crear el usuario. Ya existe el correo o el nombre de usuario en la base de datos"));
+            $this->redirect(array('usuarios'));
+        }else{
+          if($newToken->save()){
+            if($modelAuthAssigment->save()){
+              $model->idAuthAssignment = $modelAuthAssigment->idAuthAssignment;
+              if ($model->save()) {
+                $mailSender = $this->sendMailAdvisers($keyPermission, $model->name, $model->email,$modelAuthAssigment->userid,$hash);    
+                if (Yii::app()->getRequest()->getIsAjaxRequest()){
+                  Yii::app()->end();
+                }else{
+                  Yii::app()->user->setFlash("success", Yii::t('app', "Registro creado con éxito"));
+                  $this->redirect(array('usuarios'));
+                }
+              }
+            }else {
+              Yii::app()->user->setFlash("error", Yii::t('app', "El nombre del usuario ya se encuentra registrado"));
+              $this->redirect(array('usuarios'));
+            }
+          }else{
+            Yii::log("No se ha podido cargar el key para envio de correo " . $keyPermission, "error", "actionCreate");
+            Yii::app()->user->setFlash("error", Yii::t('app', "No se ha podido crear el asesor por favor intente de nuevo"));
+            $this->redirect(array('usuarios'));
+          }    
+        } 
+      }
+      $this->actionUsuarios();    
+    }
+
+    /**
+    *
+    * Función que permite el envío de correos electrónicos apra los asesores, para el ingreso al sistema
+    * @param $key Key generado por la plataforma para no aceptar peticiones fuera de esta
+    * @param $name Nombre del usaurio al que se envía el correo
+    * @param $mail Correo electrónico al cual se envía el correo
+    * @param $user Usuario con el cual se va registra el asesor
+    * @param $password Clave con la cual el asesor va a ingresar al sistema 
+    */
+    public function sendMailAdvisers($key,$name, $mail,$user,$password) {
+      Yii::log("Se hace el envío de correo", "error", "sendMailAdvisers");
+      $token = Token::model()->findByAttributes(array('permision_key'=>$key));
+      if(count($token)>0){
+        Yii::log("Se prepara el envío de correo", "error", "sendMailAdvisers");
+        $token->delete();
+        $subject = 'Credenciales para el ingreso';
+        $bodyEmail = '<table width="100%" border="0" align="center">
+        <tr>
+          <td height="100%">
+            <table width="100%" border="0" align="center">
+              <tr>
+                <td>
+                  <p>
+                    Hola, ' .$name. ', se ha generado un clave para el ingreso al sistema de Cojunal a continuación se muestran los datos.
+                    <p>
+
+                      -<b>Link de ingreso:</b> ' .Yii::app()->getBaseUrl(true). '/iniciar-sesion <br>
+                      -<b>Usuario:</b> ' .$user. '<br>
+                      -<b>Clave:</b> '.$password.'<br>
+
+                      <br><br>
+                      Cordialmente,<br>Staff <a href="http://cojunal.com" target="_blank">cojunal.com</a>
+                      <br><br>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>';
+          if(Controller::sendMailMandrill(array($mail), $subject, $bodyEmail)){
+            Yii::log("Se envió el correo", "error", "sendMailAdvisers");
+            return true;
+          }else {
+            Yii::log("No se envió el correo", "error", "sendMailAdvisers");
+            return "mail-error";
+          }    
+      }else{
+        Yii::log("Hubo un error con el Token" . $key , "error", "sendMailAdvisers");
+        return false;
+      } 
+    }
+
+}
